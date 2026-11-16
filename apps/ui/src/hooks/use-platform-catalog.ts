@@ -8,6 +8,8 @@ export type CatalogPlan = {
   yearlyPriceCents?: number | null;
   monthlyCredits: number;
   connectToolCalls: number | null;
+  /** The most calls that change something, within connectToolCalls; absent means no cap. */
+  connectWriteCalls?: number | null;
   concurrentRuns: number;
   maxSeconds: number;
   deviceLimit: number | null;
@@ -33,6 +35,8 @@ export type PlatformCatalog = {
   plans: CatalogPlan[];
   topups: Array<{ id: string; priceCents: number; credits: number; versionId: string }>;
   trial: { days: number; credits: number };
+  /** The trial is the card-backed Pro trial (a payment method is saved at checkout). */
+  proTrial?: boolean;
 };
 let current: PlatformCatalog | null = null,
   pending: Promise<PlatformCatalog> | null = null,

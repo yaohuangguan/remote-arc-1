@@ -614,6 +614,7 @@ export function createFollowupPreview(storage: Pick<Storage, "getItem" | "setIte
           "connect_trial_started",
           "connect_trial_ending",
           "plan_started",
+          "pro_trial_ending",
         ];
         if (
           !kinds.includes(kind) ||
@@ -644,7 +645,7 @@ export function createFollowupPreview(storage: Pick<Storage, "getItem" | "setIte
             checkout: "https://agent.remotearc.app/checkout?product=pro",
             billing: "https://agent.remotearc.app/settings?section=billing",
             unsubscribe:
-              kind === "plan_started"
+              kind === "plan_started" || kind === "pro_trial_ending"
                 ? null
                 : "https://remotearc.app/email/follow-up/unsubscribe?token=preview",
           },

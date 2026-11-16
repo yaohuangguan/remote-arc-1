@@ -14,16 +14,25 @@ import { previewActivationUsers } from "./activation-preview.js";
 
 export const UI_PREVIEW = import.meta.env.VITE_UI_PREVIEW === "1";
 
-/** ?quota=full|trial|slow|slow-next shows the Connect allowance states of a Free
- * account; without it, one near its allowance with the trial still to come. */
-function previewUsage(quota: string | null) {
+/** ?quota=low|full|trial|slow|slow-next|writes|writes-next|shared shows the Connect
+ * allowance states of a Free account; without it, one near its allowance. writes: its
+ * write cap is used up with reads left, after (writes) or before (writes-next) its
+ * trial. The card-backed Pro trial is on, as decided, and replaces the one-off Connect
+ * trial; ?protrial=used shows an account that had it, ?protrial=off the old trial. */
+const previewProTrial = () => new URLSearchParams(location.search).get("protrial");
+const proTrialOn = () => previewProTrial() !== "off";
+// Set when the preview's Start trial button is used; the trial never starts by itself.
+let previewTrialStarted = false;
+function previewUsage(requested: string | null) {
   const month = new Date().toISOString().slice(0, 7);
+  const startable = requested === "full" || requested === "writes-next";
+  const quota = previewTrialStarted && startable ? "trial" : requested;
   const base = { month, limit: 10000, unlimited: false };
   const overflow = (trial: { startedAt: string; endsAt: string; active: boolean } | null) => ({
     trialDays: CONNECT_FREE_OVERFLOW.trialDays,
     slowLaneCallsPerMinute: CONNECT_FREE_OVERFLOW.slowLaneCallsPerMinute,
     trial,
-    trialAvailable: !trial,
+    trialAvailable: !trial && !proTrialOn(),
     slowLaneCallsThisMonth: trial && !trial.active ? 214 : 0,
   });
   if (quota === "trial")
@@ -49,12 +58,40 @@ function previewUsage(quota: string | null) {
       }),
     };
   if (quota === "full") return { ...base, used: 10000, remaining: 0, freeOverflow: overflow(null) };
+  if (quota === "low") return { ...base, used: 1240, remaining: 8760 };
+  if (quota === "shared")
+    return {
+      ...base,
+      used: 10000,
+      remaining: 0,
+      freeOverflow: {
+        ...overflow(null),
+        trialAvailable: false,
+        trialUnavailableReason: "shared_computer" as const,
+      },
+    };
+  if (quota === "writes" || quota === "writes-next")
+    return {
+      ...base,
+      used: 6200,
+      remaining: 3800,
+      writes: { used: 5000, limit: 5000, remaining: 0 },
+      freeOverflow: overflow(
+        quota === "writes"
+          ? {
+              startedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+              endsAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+              active: false,
+            }
+          : null,
+      ),
+    };
   return {
     ...base,
     used: 8700,
     remaining: 1300,
     afterAllowance: {
-      next: quota === "slow-next" ? "slow_lane" : "trial",
+      next: quota === "slow-next" || proTrialOn() ? "slow_lane" : "trial",
       trialDays: CONNECT_FREE_OVERFLOW.trialDays,
       slowLaneCallsPerMinute: CONNECT_FREE_OVERFLOW.slowLaneCallsPerMinute,
     },
@@ -710,6 +747,20 @@ export function installUiPreviewFetchMock(mcpEndpoint: string) {
             : "device_unreachable",
         executionConfirmed: false,
       });
+    // Starting the Connect trial: allowed where the preview's usage offers it.
+    if (url.pathname === "/api/usage/connect-trial") {
+      const quota = new URL(location.href).searchParams.get("quota");
+      if (quota !== "full" && quota !== "writes-next")
+        return json(
+          {
+            error: "CONNECT_TRIAL_UNAVAILABLE",
+            reason: quota === "shared" ? "shared_computer" : "not_needed",
+          },
+          409,
+        );
+      previewTrialStarted = true;
+      return json({ usage: previewUsage(quota) });
+    }
     if (method !== "GET") {
       return json(
         { error: "PR Preview is read-only. This action is not connected to production." },
@@ -731,6 +782,8 @@ export function installUiPreviewFetchMock(mcpEndpoint: string) {
         plans,
         topups: ARC_TOPUPS.map((p) => ({ ...p, versionId: "preview:" + p.id })),
         trial: { days: 7, credits: 300 },
+        // ?trial=pro previews the site once the card-backed Pro trial is on.
+        proTrial: new URLSearchParams(location.search).get("trial") === "pro",
       });
     }
     if (url.pathname === "/api/arc/employees") return json({ employees: previewEmployees });
@@ -784,7 +837,10 @@ export function installUiPreviewFetchMock(mcpEndpoint: string) {
         access: {
           status: "active",
           canUse: enabled,
-          daysRemaining: 14,
+          // The decided trial: 7 days and 300 Credits.
+          daysRemaining: 7,
+          trialDays: 7,
+          trialCredits: 300,
           dailyUsedPercent: 0,
           expiresAt: null,
         },
@@ -973,6 +1029,18 @@ export function installUiPreviewFetchMock(mcpEndpoint: string) {
           ],
         },
         usage: previewUsage(new URL(location.href).searchParams.get("quota")),
+        ...(proTrialOn()
+          ? {
+              proTrial: {
+                offered: true,
+                available: previewProTrial() !== "used",
+                reason: previewProTrial() === "used" ? "used" : null,
+                days: 7,
+                credits: 300,
+                trial: null,
+              },
+            }
+          : {}),
       });
     }
 

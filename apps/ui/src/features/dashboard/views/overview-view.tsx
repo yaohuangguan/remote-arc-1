@@ -1,6 +1,7 @@
 import { OverviewGreeting } from "../../../components/overview-greeting.js";
 import { ProductIcon } from "../../../components/product-icon.js";
-import { UsageConversionBanner } from "../usage-conversion.js";
+import { UsageConversionBanner, usageBannerVisible } from "../usage-conversion.js";
+import { ProTrialEntry } from "../pro-trial-entry.js";
 import { MARKETING_ORIGIN } from "../../../config/app-config.js";
 import { platformLabel } from "../devices/device-presets.js";
 import { CopyButton } from "../../../components/public-layout.js";
@@ -29,6 +30,7 @@ export function OverviewView({ m }: { m: DashboardModel }) {
     locale,
     mcpEndpoint,
     navigateTab,
+    refreshAll,
     refreshAutomations,
     setShowAdd,
     status,
@@ -86,7 +88,9 @@ export function OverviewView({ m }: { m: DashboardModel }) {
         <UsageConversionBanner
           sectionRef={layout.refs.banner}
           usage={usage}
+          proTrial={status?.proTrial}
           pricingUrl={MARKETING_ORIGIN + (locale === "zh" ? "/zh/pricing" : "/pricing")}
+          onTrialStarted={refreshAll}
           onManagePlan={() => {
             navigateTab("settings");
             const target = new URL(location.href);
@@ -95,6 +99,9 @@ export function OverviewView({ m }: { m: DashboardModel }) {
             window.dispatchEvent(new PopStateEvent("popstate"));
           }}
         />
+      )}
+      {!statusLoading && !usageBannerVisible(usage) && (
+        <ProTrialEntry proTrial={status?.proTrial} />
       )}
       <section className="overviewStatusGrid" aria-busy={statusLoading}>
         <article className="overviewStatusCard">

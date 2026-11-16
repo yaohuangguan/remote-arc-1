@@ -1,3 +1,4 @@
+import { ConnectTrialButton } from "./connect-trial-button.js";
 import type { Translate } from "../../locales/locale-catalog.js";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../hooks/use-i18n.js";
@@ -8,6 +9,7 @@ import {
   checkoutHref,
   isConnectOnlyPlan,
   planIncludesArc,
+  PRO_TRIAL_CHECKOUT_HREF,
   transferSize,
   usageResetAt,
   type ArcBilling,
@@ -303,9 +305,30 @@ export function ArcBillingPanel() {
                 new Date(subscription.period_end).toLocaleDateString()}
             </p>
           )}
+          {data.proTrial?.trial?.active && (
+            <p>
+              {tr(
+                data.proTrial.trial.cancelAtPeriodEnd
+                  ? "billing.proTrial.panelCancelled"
+                  : "billing.proTrial.panelActive",
+                { date: new Date(data.proTrial.trial.endsAt).toLocaleDateString() },
+              )}
+            </p>
+          )}
         </div>
         <div className="raBillingActions">
-          <a className="raSettingsButton raSettingsButtonPrimary" href="/checkout">
+          {!paid && data.proTrial?.available && (
+            <a className="raSettingsButton raSettingsButtonPrimary" href={PRO_TRIAL_CHECKOUT_HREF}>
+              {tr("billing.proTrial.startLink", { days: data.proTrial.days })}
+            </a>
+          )}
+          <a
+            className={
+              "raSettingsButton" +
+              (!paid && data.proTrial?.available ? "" : " raSettingsButtonPrimary")
+            }
+            href="/checkout"
+          >
             {paid
               ? tr("billing.arcBillingPanel.changePlan")
               : tr("billing.arcBillingPanel.chooseAPlan")}
@@ -540,6 +563,21 @@ export function ArcBillingPanel() {
             <small>{tr("billing.arcBillingPanel.resets") + resetText}</small>
           )}
           {overflowText && <small>{overflowText}</small>}
+          {overflow && !overflow.trial && overflow.trialAvailable && (
+            <ConnectTrialButton
+              className="raSettingsButton"
+              trialDays={overflow.trialDays}
+              onStarted={() => setRevision((value) => value + 1)}
+            />
+          )}
+          {data.usage.writes && (
+            <small>
+              {tr("billing.arcBillingPanel.writeCallsThisMonth", {
+                used: data.usage.writes.used.toLocaleString(),
+                limit: data.usage.writes.limit.toLocaleString(),
+              })}
+            </small>
+          )}
         </div>
         {data.transfer && (
           <div className="raSettingsSurface">

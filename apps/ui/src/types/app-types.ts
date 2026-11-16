@@ -1,3 +1,4 @@
+import type { ProTrial } from "../features/billing/arc-billing-client.js";
 export type User = {
   arcAvailable?: boolean;
   id: string;
@@ -173,6 +174,8 @@ export type MonthlyUsage = {
   unlimited: boolean;
   freeOverflow?: FreeOverflow;
   afterAllowance?: AfterAllowance;
+  /** Present only where the plan caps the calls that change something. */
+  writes?: { used: number; limit: number; remaining: number };
 };
 export type ProductStatus = {
   googleConfigured: boolean;
@@ -182,6 +185,8 @@ export type ProductStatus = {
   onlineDevices: number;
   recentActivity: AuditEvent[];
   usage: MonthlyUsage;
+  /** Present where the card-backed trial is offered: whether this account can start it. */
+  proTrial?: ProTrial;
   entitlements: {
     plan: "free" | "connect" | "plus";
     features: string[];
